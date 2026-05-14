@@ -323,6 +323,23 @@ ${currentMessage}
 // ========================
 // 5. 百炼调用器
 // ========================
+// 带超时的 fetch
+async function fetchWithTimeout(url, options, timeout = 30000) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(id);
+    return response;
+  } catch (error) {
+    clearTimeout(id);
+    if (error.name === 'AbortError') {
+      throw new Error('请求超时（30秒），百炼 API 未响应');
+    }
+    throw error;
+  }
+}
+
 async function callBailianAgent(prompt, conversationId) {
   const url = `https://dashscope.aliyuncs.com/api/v1/apps/${APP_ID}/completion`;
   const payload = {
@@ -331,14 +348,14 @@ async function callBailianAgent(prompt, conversationId) {
   };
   if (conversationId) payload.parameters.conversation_id = conversationId;
 
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${DASHSCOPE_API_KEY}`
     },
     body: JSON.stringify(payload)
-  });
+  }, 30000);
 
   if (!res.ok) {
     const errBody = await res.json().catch(() => ({}));
@@ -512,6 +529,7 @@ app.post('/api/bdi/probe', async (req, res) => {
     await saveMessage(sessionId, 'assistant', aiRes.text);
 
     const phase = inferPhase(aiRes.text);
+    console.log(`[BDI] 阶段: ${phase} | 回复长度: ${aiRes.text.length} chars`);
     await updateSessionPhase(sessionId, aiRes.conversationId, phase);
 
     if (phase === 'report') {
@@ -536,8 +554,12 @@ app.post('/api/bdi/probe', async (req, res) => {
 
     return res.json({ reply: aiRes.text, phase, gfScore: gfInfo?.totalScore || null });
   } catch (err) {
-    console.error('BDI Agent Error:', err.message);
-    res.status(500).json({ error: '智能体连接故障', details: err.message });
+    console.error('[BDI ERROR]', err.message);
+    res.status(500).json({ 
+      error: '智能体连接故障', 
+      details: err.message,
+      hint: err.message.includes('超时') ? '百炼 API 响应超时，请稍后重试' : '请检查百炼应用状态和网络连接'
+    });
   }
 });
 
