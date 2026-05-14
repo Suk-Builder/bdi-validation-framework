@@ -632,6 +632,22 @@ app.post('/api/gf/submit', express.json(), (req, res) => {
 // ========================
 // 8. 核心路由
 // ========================
+
+// 兼容路由：/api/agent/completion → 透传到 /api/bdi/probe
+app.post('/api/agent/completion', async (req, res) => {
+  const { prompt, session_id } = req.body;
+  if (!prompt) return res.status(400).json({ error: '缺少prompt' });
+  // 转发到 /api/bdi/probe 的处理逻辑
+  req.body = { message: prompt, sessionId: session_id || 'default' };
+  // 直接调用百炼Agent
+  try {
+    const aiRes = await callBailianAgent(prompt, session_id);
+    res.json({ text: aiRes.text, status: 'ok' });
+  } catch (err) {
+    res.json({ text: `[降级] 错误: ${err.message}`, status: 'fallback' });
+  }
+});
+
 app.post('/api/bdi/probe', async (req, res) => {
   try {
     const { message, sessionId = 'default', nickname } = req.body;
@@ -758,7 +774,14 @@ app.get('/health', async (req, res) => {
 });
 
 // ========================
-// 11. 启动
+// 11. SPA 回退（React Router 支持）
+// ========================
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public', 'index.html'));
+});
+
+// ========================
+// 12. 启动
 // ========================
 initDB().then(() => {
   app.listen(PORT, () => {
