@@ -207,40 +207,52 @@
         if (!answer) return;
 
         const btn = document.getElementById('submit-btn');
+        const feedback = document.getElementById('feedback');
         btn.disabled = true;
         btn.textContent = '正在分析...';
+        feedback.classList.add('hidden');
 
         try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
             const res = await fetch('/api/gf/submit', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    sessionId: state.sessionId,
-                    answer: answer
-                })
+                body: JSON.stringify({ sessionId: state.sessionId, answer: answer }),
+                signal: controller.signal
             });
-            const data = await res.json();
+            clearTimeout(timeoutId);
 
-            // 显示反馈
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.message || 'HTTP ' + res.status);
+            }
+
+            const data = await res.json();
+            console.log('[GF] 提交成功:', data);
             showFeedback(data.result);
 
             if (data.isFinished) {
-                setTimeout(() => showResult(data.currentTotalScore, data.passedBDIGate), 1000);
-            } else {
+                setTimeout(() => showResult(data.currentTotalScore, data.passedBDIGate, data.sd15Anchor), 1000);
+            } else if (data.nextQuestion) {
                 setTimeout(() => {
                     state.currentQuestion = data.nextQuestion;
+                    // 更新进度显示
+                    state.questionCount = data.progress ? data.progress.current : (state.questionCount + 1);
+                    document.getElementById('progress').textContent = state.questionCount;
                     renderQuestion(state.currentQuestion);
-                    // 更新进度
-                    // 简单逻辑：假设一共6题，currentQuestion 包含 id，或者我们可以维护一个计数器
-                    // 这里为了简单，暂时不更新进度条数字，或者你可以自己在 state 里加个 count
                     btn.disabled = false;
                     btn.textContent = '提交答案';
-                    document.getElementById('feedback').classList.add('hidden');
+                    feedback.classList.add('hidden');
                 }, 1000);
+            } else {
+                throw new Error('后端未返回下一题');
             }
-
         } catch (err) {
-            alert('提交失败');
+            console.error('[GF ERROR]', err);
+            feedback.classList.remove('hidden', 'feedback-success', 'feedback-fail');
+            feedback.classList.add('feedback-fail');
+            feedback.textContent = '提交失败: ' + err.message + '，请重试';
             btn.disabled = false;
             btn.textContent = '提交答案';
         }
@@ -251,40 +263,41 @@
         fb.classList.remove('hidden', 'feedback-success', 'feedback-fail');
 
         if (result.isCorrect) {
-            fb.textContent = '回答正确！正在进入下一题...';
+            fb.textContent = '回答正确！(' + result.score + '/3.0) 正在进入下一题...';
             fb.classList.add('feedback-success');
         } else {
-            fb.textContent = '回答不正确，继续下一题...';
+            fb.textContent = result.detail + ' (' + result.score + '/3.0) 继续下一题...';
             fb.classList.add('feedback-fail');
         }
     }
 
     // 3. 显示结果
-    async function showResult(score, passed) {
+    function showResult(score, passed, sd15) {
         // 保存 GF 结果到 localStorage（供 BDI 页面读取）
         localStorage.setItem('gf_session_id', state.sessionId);
         localStorage.setItem('gf_passed', passed ? 'true' : 'false');
         localStorage.setItem('gf_score', String(score));
+        if (sd15) localStorage.setItem('gf_anchor', sd15.label || sd15);
 
         document.getElementById('quiz-area').classList.add('hidden');
         document.getElementById('result-area').classList.remove('hidden');
 
-        document.getElementById('final-score').textContent = score;
+        document.getElementById('final-score').textContent = score + '/18 (SD15 ' + (sd15 ? (sd15.label || sd15) : 'N/A') + ')';
 
         const msg = document.getElementById('bdi-msg');
         const btnArea = document.getElementById('bdi-btn-area');
 
         if (passed) {
-            msg.textContent = "你的流体智力已进入BDI探测区间。";
+            msg.textContent = "GF 前置测试已通过，流体智力进入 BDI 探测区间。";
             msg.style.color = "#28a745";
-            btnArea.innerHTML = `<a href="/bdi-chat.html" class="bdi-link">进入 BDI 探测对话 →</a>`;
+            btnArea.innerHTML = '<a href="/bdi-chat.html" class="bdi-link">进入 BDI 核心探测 &rarr;</a>';
         } else {
-            msg.textContent = "暂未达到 BDI 探测门槛，建议休息后重试。";
+            msg.textContent = "暂未达到 BDI 探测门槛（需≥13分），建议休息后重试。";
             msg.style.color = "#dc3545";
-            btnArea.innerHTML = `<a href="/index.html" class="bdi-link" style="background:#6c757d">返回首页</a>`;
+            btnArea.innerHTML = '<a href="/gf-test.html" class="bdi-link" style="background:#6c757d">重新测试</a>';
         }
     }
-    </script>
+</script>
 
 </body>
 </html>
