@@ -571,7 +571,15 @@
             el.input.focus();
         }
 
-        function editNickname() {
+        // 重试最后一条消息
+function retryLastMessage() {
+    if (state.lastMessage) {
+        el.input.value = state.lastMessage;
+        sendMessage();
+    }
+}
+
+function editNickname() {
             el.nickInput.value = localStorage.getItem('bdi_nickname') || '';
             el.nickModal.classList.add('active');
             el.nickInput.focus();
@@ -675,6 +683,28 @@
                         gfSessionId: state.gfSessionId,
                     })
                 });
+
+                if (res.status === 500 || res.status === 408) {
+                    loadDiv.remove();
+                    const errData = await res.json().catch(() => ({}));
+
+                    const retryDiv = document.createElement('div');
+                    retryDiv.className = 'msg bot';
+                    retryDiv.innerHTML = `
+                        <span class="phase-tag">⚠️ 连接不稳定</span>
+                        <div style="color: var(--text-muted); margin-bottom: 12px;">
+                            ${errData.hint || '百炼 API 响应超时，建议重试。'}
+                        </div>
+                        <button onclick="retryLastMessage()" style="padding: 8px 20px; background: var(--primary); color: #fff; border: none; border-radius: 8px; cursor: pointer; font-size: 0.9rem;">
+                            🔄 重新发送
+                        </button>
+                    `;
+                    el.messages.appendChild(retryDiv);
+                    el.messages.scrollTop = el.messages.scrollHeight;
+
+                    state.lastMessage = text;
+                    return;
+                }
 
                 if (res.status === 403) {
                     const errData = await res.json();
