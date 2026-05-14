@@ -121,6 +121,18 @@
             background: #f8d7da;
             color: #721c24;
         }
+    
+        /* ===== GF 进度条系统 ===== */
+        .gf-progress-bar { display: flex; gap: 6px; margin: 16px 0; padding: 0 10px; }
+        .gf-progress-cell { flex: 1; height: 8px; background: #e2e8f0; border-radius: 4px; transition: all 0.4s ease; }
+        .gf-progress-cell.filled { background: linear-gradient(90deg, #3b82f6, #60a5fa); box-shadow: 0 0 8px rgba(59,130,246,0.4); }
+        .gf-progress-cell.current { background: linear-gradient(90deg, #3b82f6, #93c5fd); animation: pulse-cell 1.5s ease-in-out infinite; }
+        @keyframes pulse-cell { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .gf-analyzing { display: none; align-items: center; justify-content: center; gap: 12px; padding: 14px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; margin: 12px 0; font-size: 0.9rem; color: #0369a1; }
+        .gf-analyzing.active { display: flex; }
+        .gf-analyzing .spinner { width: 18px; height: 18px; border: 2px solid #bae6fd; border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .gf-dimension-hint { font-size: 0.8rem; color: #64748b; text-align: center; margin-top: 4px; }
     </style>
 </head>
 <body>
@@ -136,6 +148,19 @@
                 <div style="text-align: right; color: #999; font-size: 0.9em;">进度: <span id="progress">1</span>/6</div>
             </div>
 
+            
+            <div class="gf-progress-bar" id="gf-progress">
+                <div class="gf-progress-cell filled" id="prog-1"></div>
+                <div class="gf-progress-cell" id="prog-2"></div>
+                <div class="gf-progress-cell" id="prog-3"></div>
+                <div class="gf-progress-cell" id="prog-4"></div>
+                <div class="gf-progress-cell" id="prog-5"></div>
+                <div class="gf-progress-cell" id="prog-6"></div>
+            </div>
+            <div class="gf-analyzing" id="gf-analyzing">
+                <div class="spinner"></div>
+                <span id="analyzing-text">正在分析中...</span>
+            </div>
             <div class="question-box">
                 <span class="dimension-tag" id="dim-tag">维度</span>
                 <div class="question-text" id="q-text">题目加载中...</div>
@@ -192,70 +217,33 @@
 
     // 渲染题目
     function renderQuestion(q) {
-        document.getElementById('dim-tag').textContent = q.dimension;
-        document.getElementById('q-text').textContent = q.question;
+        if (!q) { console.error('[GF] renderQuestion: q is null'); return; }
+
+        // 隐藏分析中提示
+        const analyzingEl = document.getElementById('gf-analyzing');
+        if (analyzingEl) analyzingEl.classList.remove('active');
+
+        document.getElementById('dim-tag').textContent = q.dimension || '';
+        document.getElementById('q-text').textContent = q.question || '';
         document.getElementById('user-answer').value = '';
         document.getElementById('user-answer').focus();
 
-        // 如果是图形/选项题，这里可以根据 type 切换 input 为 select 或 radio
-        // v1.0 暂时统一用文本框输入
-    }
+        // 更新进度条
+        state.questionCount = q.id || (state.questionCount + 1);
+        document.getElementById('progress').textContent = state.questionCount;
 
-    // 2. 提交答案
-    async function submitAnswer() {
-        const answer = document.getElementById('user-answer').value.trim();
-        if (!answer) return;
-
-        const btn = document.getElementById('submit-btn');
-        const feedback = document.getElementById('feedback');
-        btn.disabled = true;
-        btn.textContent = '正在分析...';
-        feedback.classList.add('hidden');
-
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000);
-            const res = await fetch('/api/gf/submit', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sessionId: state.sessionId, answer: answer }),
-                signal: controller.signal
-            });
-            clearTimeout(timeoutId);
-
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw new Error(err.message || 'HTTP ' + res.status);
+        for (let i = 1; i <= 6; i++) {
+            const cell = document.getElementById('prog-' + i);
+            if (!cell) continue;
+            cell.classList.remove('filled', 'current');
+            if (i < state.questionCount) {
+                cell.classList.add('filled');
+            } else if (i === state.questionCount) {
+                cell.classList.add('current');
             }
-
-            const data = await res.json();
-            console.log('[GF] 提交成功:', data);
-            showFeedback(data.result);
-
-            if (data.isFinished) {
-                setTimeout(() => showResult(data.currentTotalScore, data.passedBDIGate, data.sd15Anchor), 1000);
-            } else if (data.nextQuestion) {
-                setTimeout(() => {
-                    state.currentQuestion = data.nextQuestion;
-                    // 更新进度显示
-                    state.questionCount = data.progress ? data.progress.current : (state.questionCount + 1);
-                    document.getElementById('progress').textContent = state.questionCount;
-                    renderQuestion(state.currentQuestion);
-                    btn.disabled = false;
-                    btn.textContent = '提交答案';
-                    feedback.classList.add('hidden');
-                }, 1000);
-            } else {
-                throw new Error('后端未返回下一题');
-            }
-        } catch (err) {
-            console.error('[GF ERROR]', err);
-            feedback.classList.remove('hidden', 'feedback-success', 'feedback-fail');
-            feedback.classList.add('feedback-fail');
-            feedback.textContent = '提交失败: ' + err.message + '，请重试';
-            btn.disabled = false;
-            btn.textContent = '提交答案';
         }
+
+        console.log('[GF] 显示第' + state.questionCount + '题:', q.dimension);
     }
 
     function showFeedback(result) {
