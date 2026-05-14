@@ -1,16 +1,20 @@
-// package.json
 {
   "name": "bdi-v25-framework",
   "version": "2.5.0",
+  "description": "BDI 建造者密度探测仪 v2.5 - GF→BDI门槛打通版",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "cors": "^2.8.5",
-    "dotenv": "^16.3.1",
-    "pg": "^8.11.3"
-  }
+    "express": "^4.21.2",
+    "pg": "^8.15.6",
+    "dotenv": "^16.5.0",
+    "uuid": "^11.1.0",
+    "cors": "^2.8.5"
+  },
+  "keywords": ["bdi", "builder", "density", "intelligence", "probe"],
+  "author": "SUK_桦树工坊",
+  "license": "MIT"
 }
