@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GF 流体智力测试</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            background: #f4f6f8;
+            padding: 40px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .question-box {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-left: 4px solid #007bff;
+            border-radius: 4px;
+        }
+
+        .question-text {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .dimension-tag {
+            display: inline-block;
+            background: #e9ecef;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        button {
+            background: #007bff;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 1em;
+        }
+
+            button:hover {
+                background: #0056b3;
+            }
+
+            button:disabled {
+                background: #ccc;
+                cursor: not-allowed;
+            }
+
+        .hidden {
+            display: none;
+        }
+
+        .result-box {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .score-display {
+            font-size: 2em;
+            font-weight: bold;
+            color: #28a745;
+            margin: 10px 0;
+        }
+
+        .bdi-link {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 12px 24px;
+            background: #28a745;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+        }
+
+        #feedback {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .feedback-success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .feedback-fail {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container" id="app">
+        <!-- 加载状态 -->
+        <div id="loading">正在加载题目...</div>
+
+        <!-- 答题区域 -->
+        <div id="quiz-area" class="hidden">
+            <div class="header">
+                <h2>通用流体智力探测 (1/6)</h2>
+                <div style="text-align: right; color: #999; font-size: 0.9em;">进度: <span id="progress">1</span>/6</div>
+            </div>
+
+            <div class="question-box">
+                <span class="dimension-tag" id="dim-tag">维度</span>
+                <div class="question-text" id="q-text">题目加载中...</div>
+            </div>
+
+            <input type="text" id="user-answer" placeholder="请输入你的答案..." autocomplete="off" />
+            <button id="submit-btn" onclick="submitAnswer()">提交答案</button>
+            <div id="feedback" class="hidden"></div>
+        </div>
+
+        <!-- 结果区域 -->
+        <div id="result-area" class="hidden result-box">
+            <h2>测试完成</h2>
+            <p>你的流体智力得分</p>
+            <div class="score-display"><span id="final-score">0</span></div>
+            <p id="bdi-msg"></p>
+            <div id="bdi-btn-area"></div>
+            <br>
+            <a href="/index.html" style="color: #666; font-size: 0.9em;">返回首页</a>
+        </div>
+    </div>
+
+    <script>
+    // 状态管理
+    let state = {
+        sessionId: null,
+        currentQuestion: null,
+        isFinished: false
+    };
+
+    // 页面加载时启动测试
+    window.onload = async function() {
+        await startTest();
+    };
+
+    // 1. 获取题目
+    async function startTest() {
+        try {
+            const res = await fetch('/api/gf/start');
+            const data = await res.json();
+
+            state.sessionId = data.sessionId;
+            state.currentQuestion = data.currentQuestion;
+
+            renderQuestion(state.currentQuestion);
+
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('quiz-area').classList.remove('hidden');
+        } catch (err) {
+            alert('获取题目失败，请检查后端是否启动');
+            console.error(err);
+        }
+    }
+
+    // 渲染题目
+    function renderQuestion(q) {
+        document.getElementById('dim-tag').textContent = q.dimension;
+        document.getElementById('q-text').textContent = q.question;
+        document.getElementById('user-answer').value = '';
+        document.getElementById('user-answer').focus();
+
+        // 如果是图形/选项题，这里可以根据 type 切换 input 为 select 或 radio
+        // v1.0 暂时统一用文本框输入
+    }
+
+    // 2. 提交答案
+    async function submitAnswer() {
+        const answer = document.getElementById('user-answer').value.trim();
+        if (!answer) return;
+
+        const btn = document.getElementById('submit-btn');
+        btn.disabled = true;
+        btn.textContent = '正在分析...';
+
+        try {
+            const res = await fetch('/api/gf/submit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sessionId: state.sessionId,
+                    answer: answer
+                })
+            });
+            const data = await res.json();
+
+            // 显示反馈
+            showFeedback(data.result);
+
+            if (data.isFinished) {
+                setTimeout(() => showResult(data.currentTotalScore, data.passedBDIGate), 1000);
+            } else {
+                setTimeout(() => {
+                    state.currentQuestion = data.nextQuestion;
+                    renderQuestion(state.currentQuestion);
+                    // 更新进度
+                    // 简单逻辑：假设一共6题，currentQuestion 包含 id，或者我们可以维护一个计数器
+                    // 这里为了简单，暂时不更新进度条数字，或者你可以自己在 state 里加个 count
+                    btn.disabled = false;
+                    btn.textContent = '提交答案';
+                    document.getElementById('feedback').classList.add('hidden');
+                }, 1000);
+            }
+
+        } catch (err) {
+            alert('提交失败');
+            btn.disabled = false;
+            btn.textContent = '提交答案';
+        }
+    }
+
+    function showFeedback(result) {
+        const fb = document.getElementById('feedback');
+        fb.classList.remove('hidden', 'feedback-success', 'feedback-fail');
+
+        if (result.isCorrect) {
+            fb.textContent = '回答正确！正在进入下一题...';
+            fb.classList.add('feedback-success');
+        } else {
+            fb.textContent = '回答不正确，继续下一题...';
+            fb.classList.add('feedback-fail');
+        }
+    }
+
+    // 3. 显示结果
+    async function showResult(score, passed) {
+        // 保存 GF 结果到 localStorage（供 BDI 页面读取）
+        localStorage.setItem('gf_session_id', state.sessionId);
+        localStorage.setItem('gf_passed', passed ? 'true' : 'false');
+        localStorage.setItem('gf_score', String(score));
+
+        document.getElementById('quiz-area').classList.add('hidden');
+        document.getElementById('result-area').classList.remove('hidden');
+
+        document.getElementById('final-score').textContent = score;
+
+        const msg = document.getElementById('bdi-msg');
+        const btnArea = document.getElementById('bdi-btn-area');
+
+        if (passed) {
+            msg.textContent = "你的流体智力已进入BDI探测区间。";
+            msg.style.color = "#28a745";
+            btnArea.innerHTML = `<a href="/bdi-chat.html" class="bdi-link">进入 BDI 探测对话 →</a>`;
+        } else {
+            msg.textContent = "暂未达到 BDI 探测门槛，建议休息后重试。";
+            msg.style.color = "#dc3545";
+            btnArea.innerHTML = `<a href="/index.html" class="bdi-link" style="background:#6c757d">返回首页</a>`;
+        }
+    }
+    </script>
+
+</body>
+</html>

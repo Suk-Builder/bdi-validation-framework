@@ -1,0 +1,669 @@
+<!-- public/bdi-chat.html -->
+<!-- BDI v2.5 · 建造者密度探测仪（GF→BDI 打通版） -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BDI v2.5 · 建造者密度探测仪</title>
+    <style>
+        :root {
+            --bg: #0b1120;
+            --surface: #151e32;
+            --border: #2a3650;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --user-bg: #2563eb;
+            --bot-bg: #1e293b;
+            --gold: #fbbf24;
+            --success: #22c55e;
+            --danger: #ef4444;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 720px;
+            background: var(--surface);
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            height: 90vh;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+        }
+
+        .header {
+            padding: 18px 24px;
+            border-bottom: 1px solid var(--border);
+            text-align: center;
+            position: relative;
+        }
+
+        .header-title {
+            font-weight: 600;
+            font-size: 1.1rem;
+            letter-spacing: 0.5px;
+            color: var(--primary);
+        }
+
+        .header-sub {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* GF 状态显示 */
+        .gf-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 6px;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        .gf-status.pending {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--danger);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+        .gf-status.passed {
+            background: rgba(34, 197, 94, 0.15);
+            color: var(--success);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+        .gf-status .score {
+            font-weight: 700;
+            color: var(--gold);
+        }
+
+        .header-nav {
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        .header-nav a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.8rem;
+            padding: 6px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+        .header-nav a:hover {
+            color: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .nickname-bar {
+            padding: 8px 20px;
+            background: rgba(59, 130, 246, 0.05);
+            border-bottom: 1px solid var(--border);
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .nickname-bar .edit-nick {
+            color: var(--primary);
+            cursor: pointer;
+            font-size: 0.75rem;
+        }
+        .nickname-bar .edit-nick:hover { text-decoration: underline; }
+
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .msg {
+            max-width: 85%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            white-space: pre-wrap;
+            word-break: break-word;
+            animation: fadeIn 0.25s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .msg.user {
+            background: var(--user-bg);
+            color: #fff;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+
+        .msg.bot {
+            background: var(--bot-bg);
+            color: var(--text);
+            align-self: flex-start;
+            border: 1px solid var(--border);
+            border-bottom-left-radius: 4px;
+        }
+
+        .phase-tag {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            font-style: italic;
+            display: block;
+            border-bottom: 1px solid rgba(148,163,184,0.2);
+            padding-bottom: 4px;
+        }
+
+        .input-area {
+            padding: 16px 20px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 12px;
+            background: var(--surface);
+        }
+        .input-area input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: #0f172a;
+            color: var(--text);
+            font-size: 15px;
+            outline: none;
+            transition: border 0.2s;
+        }
+        .input-area input:focus { border-color: var(--primary); }
+        .input-area button {
+            padding: 0 20px;
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+        .input-area button:hover { background: var(--primary-hover); }
+        .input-area button:disabled {
+            background: #475569;
+            cursor: not-allowed;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+        }
+        .modal-overlay.active { opacity: 1; visibility: visible; }
+
+        .modal {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 32px;
+            width: 90%;
+            max-width: 420px;
+            text-align: center;
+        }
+        .modal h2 { color: var(--primary); margin-bottom: 16px; font-size: 1.3rem; }
+        .modal p { color: var(--text-muted); margin-bottom: 24px; font-size: 0.9rem; }
+        .modal input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: #0f172a;
+            color: var(--text);
+            font-size: 15px;
+            margin-bottom: 20px;
+            outline: none;
+        }
+        .modal input:focus { border-color: var(--primary); }
+        .modal button {
+            width: 100%;
+            padding: 12px;
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 1rem;
+        }
+        .modal button:hover { background: var(--primary-hover); }
+        .modal .secondary-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            margin-top: 10px;
+        }
+        .modal .secondary-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .error-toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-100px);
+            background: #ef4444;
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            z-index: 1001;
+            transition: transform 0.3s;
+        }
+        .error-toast.show { transform: translateX(-50%) translateY(0); }
+
+        .gf-blocked {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            padding: 40px 20px;
+            text-align: center;
+            color: var(--text-muted);
+        }
+        .gf-blocked .icon { font-size: 3rem; }
+        .gf-blocked h3 { color: var(--primary); font-size: 1.2rem; }
+        .gf-blocked p { max-width: 400px; font-size: 0.9rem; line-height: 1.8; }
+        .gf-blocked a {
+            display: inline-block;
+            margin-top: 8px;
+            padding: 12px 32px;
+            background: var(--primary);
+            color: #fff;
+            text-decoration: none;
+            border-radius: 10px;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+        .gf-blocked a:hover { background: var(--primary-hover); }
+
+        @media (max-width: 640px) {
+            body { padding: 0; height: 100dvh; }
+            .container { height: 100dvh; border-radius: 0; max-width: 100%; }
+            .header-nav { position: static; transform: none; margin-top: 8px; }
+            .msg { max-width: 92%; }
+        }
+    </style>
+</head>
+<body>
+    <!-- 昵称弹窗 -->
+    <div class="modal-overlay" id="nickModal">
+        <div class="modal">
+            <h2 id="nickModalTitle">🔑 建造者代号</h2>
+            <p id="nickModalDesc">请输入你的代号，用于排行榜展示。<br>160以上，只有同行。</p>
+            <input type="text" id="nickInput" placeholder="例如：白桦、彩叶..." maxlength="20">
+            <button onclick="confirmNickname()">进入探测仪</button>
+        </div>
+    </div>
+
+    <!-- GF 未完成弹窗 -->
+    <div class="modal-overlay" id="gfModal">
+        <div class="modal">
+            <h2>🧠 前置测试未完成</h2>
+            <p>BDI 核心探测需要先完成 GF 流体智力前置测试。<br>共 6 题，需 ≥13/18 分方可进入。</p>
+            <button onclick="goToGFTest()">前往 GF 前置测试</button>
+            <button class="secondary-btn" onclick="checkGFAgain()">我已做过，刷新状态</button>
+        </div>
+    </div>
+
+    <div class="error-toast" id="errorToast"></div>
+
+    <div class="container">
+        <div class="header">
+            <div class="header-title">🔍 BDI v2.5 · 建造者密度探测仪</div>
+            <div class="header-sub" id="headerSub">协议 v2.5 已装载 | 刻度止于160</div>
+            <!-- GF 状态标签 -->
+            <div class="gf-status pending" id="gfStatus" style="display:none;">
+                <span id="gfStatusText">GF 校验中...</span>
+            </div>
+            <div class="header-nav">
+                <a href="/leaderboard.html">🏆 排行榜</a>
+            </div>
+        </div>
+
+        <div class="nickname-bar" id="nicknameBar" style="display: none;">
+            <span>建造者：<strong id="nicknameDisplay">匿名</strong></span>
+            <span class="edit-nick" onclick="editNickname()">修改代号</span>
+        </div>
+
+        <div class="messages" id="messages">
+            <!-- 动态内容 -->
+        </div>
+
+        <div class="input-area" id="inputArea">
+            <input type="text" id="input" placeholder="输入回答或指令..." autocomplete="off" maxlength="2000">
+            <button id="send">发送</button>
+        </div>
+    </div>
+
+    <script>
+        // ========================
+        // 状态管理
+        // ========================
+        const state = {
+            sessionId: null,
+            nickname: null,
+            gfSessionId: null,
+            gfPassed: false,
+            gfScore: null,
+            gfAnchor: null,
+        };
+
+        const el = {
+            messages: document.getElementById('messages'),
+            input: document.getElementById('input'),
+            send: document.getElementById('send'),
+            nickModal: document.getElementById('nickModal'),
+            nickInput: document.getElementById('nickInput'),
+            nicknameBar: document.getElementById('nicknameBar'),
+            nicknameDisplay: document.getElementById('nicknameDisplay'),
+            errorToast: document.getElementById('errorToast'),
+            gfModal: document.getElementById('gfModal'),
+            gfStatus: document.getElementById('gfStatus'),
+            gfStatusText: document.getElementById('gfStatusText'),
+            headerSub: document.getElementById('headerSub'),
+            inputArea: document.getElementById('inputArea'),
+        };
+
+        // ========================
+        // 初始化
+        // ========================
+        function init() {
+            // 获取/创建 BDI session
+            let sid = localStorage.getItem('bdi_v25_sid');
+            if (!sid) {
+                sid = 'sess_' + Date.now() + '_' + Math.random().toString(36).slice(2, 11);
+                localStorage.setItem('bdi_v25_sid', sid);
+            }
+            state.sessionId = sid;
+
+            // 检查 GF 状态
+            checkGFStatus();
+        }
+
+        // ========================
+        // GF 状态检查
+        // ========================
+        function checkGFStatus() {
+            const gfSid = localStorage.getItem('gf_session_id');
+            const gfPassed = localStorage.getItem('gf_passed') === 'true';
+            const gfScore = localStorage.getItem('gf_score');
+            const gfAnchor = localStorage.getItem('gf_anchor');
+
+            if (gfSid && gfPassed && gfScore) {
+                // GF 已通过
+                state.gfSessionId = gfSid;
+                state.gfPassed = true;
+                state.gfScore = gfScore;
+                state.gfAnchor = gfAnchor;
+                showGFPassed(gfScore, gfAnchor);
+                showChatUI();
+            } else if (gfSid) {
+                // 有 GF session 但不确定状态，尝试查询
+                queryGFResult(gfSid);
+            } else {
+                // 没有 GF session，显示阻塞界面
+                showGFBlocked();
+            }
+        }
+
+        // 向后端查询 GF 结果
+        async function queryGFResult(gfSid) {
+            // GF 结果无法直接查询，需要用户完成测试
+            // 显示阻塞界面
+            showGFBlocked();
+        }
+
+        // ========================
+        // UI 状态切换
+        // ========================
+        function showGFBlocked() {
+            el.gfStatus.style.display = 'inline-flex';
+            el.gfStatus.className = 'gf-status pending';
+            el.gfStatusText.textContent = 'GF 前置测试未完成';
+            el.headerSub.textContent = '需先完成流体智力前置测试（≥13/18分）';
+
+            el.messages.innerHTML = `
+                <div class="gf-blocked">
+                    <div class="icon">🚧</div>
+                    <h3>BDI 核心探测入口已锁定</h3>
+                    <p>根据 BDI Protocol v2.5，核心密度探测需要先通过 GF 流体智力前置测试。<br><br>
+                    测试内容：数字序列推理、图形矩阵、逻辑推演、工作记忆广度、概念压缩类比、故事回忆。<br>
+                    共 6 题，满分 18 分，需 ≥13 分方可进入。</p>
+                    <a href="/gf-test.html">🧠 前往 GF 前置测试</a>
+                </div>
+            `;
+            el.inputArea.style.display = 'none';
+
+            // 延迟显示弹窗
+            setTimeout(() => el.gfModal.classList.add('active'), 500);
+        }
+
+        function showGFPassed(score, anchor) {
+            el.gfStatus.style.display = 'inline-flex';
+            el.gfStatus.className = 'gf-status passed';
+            el.gfStatusText.innerHTML = `GF 已通过 <span class="score">${score}/18</span> · SD15 ${anchor}`;
+            el.headerSub.textContent = `协议 v2.5 已装载 | GF ${score}/18 | 刻度止于160`;
+        }
+
+        function showChatUI() {
+            el.inputArea.style.display = 'flex';
+            el.messages.innerHTML = `
+                <div class="msg bot">
+                    <span class="phase-tag">系统初始化 | 协议 v2.5 已装载 | GF 门槛已通过</span>
+                    探测仪就绪。请输入"开始探测"以启动模型身份声明与 BDI 核心密度探测。
+                </div>
+            `;
+
+            // 检查昵称
+            const nick = localStorage.getItem('bdi_nickname');
+            if (nick) {
+                state.nickname = nick;
+                updateNicknameDisplay(nick);
+            } else {
+                el.nickModal.classList.add('active');
+                el.nickInput.focus();
+            }
+        }
+
+        // ========================
+        // 导航
+        // ========================
+        function goToGFTest() {
+            window.location.href = '/gf-test.html';
+        }
+
+        function checkGFAgain() {
+            el.gfModal.classList.remove('active');
+            checkGFStatus();
+        }
+
+        // ========================
+        // 昵称管理
+        // ========================
+        function confirmNickname() {
+            const nick = el.nickInput.value.trim();
+            if (!nick) { showError('请输入代号'); return; }
+            if (nick.length > 20) { showError('代号不超过20字'); return; }
+            localStorage.setItem('bdi_nickname', nick);
+            state.nickname = nick;
+            el.nickModal.classList.remove('active');
+            updateNicknameDisplay(nick);
+            el.input.focus();
+        }
+
+        function editNickname() {
+            el.nickInput.value = localStorage.getItem('bdi_nickname') || '';
+            el.nickModal.classList.add('active');
+            el.nickInput.focus();
+        }
+
+        function updateNicknameDisplay(nick) {
+            el.nicknameDisplay.textContent = nick;
+            el.nicknameBar.style.display = 'flex';
+        }
+
+        function showError(msg) {
+            el.errorToast.textContent = msg;
+            el.errorToast.classList.add('show');
+            setTimeout(() => el.errorToast.classList.remove('show'), 3000);
+        }
+
+        // ========================
+        // 消息发送
+        // ========================
+        const PHASES = {
+            identity_declaration: '🔹 阶段：模型身份声明',
+            fluid_test: '🧠 阶段：前置流体智力测试',
+            scoring: '📊 阶段：评分与判定',
+            bdi_probe: '⚡ 阶段：BDI核心密度探测',
+            report: '📜 阶段：探测报告输出',
+            error: '⚠️ 阶段：会话异常'
+        };
+
+        function appendMsg(text, type, phase) {
+            const wrap = document.createElement('div');
+            wrap.className = `msg ${type}`;
+            if (type === 'bot' && phase && PHASES[phase]) {
+                const tag = document.createElement('span');
+                tag.className = 'phase-tag';
+                tag.textContent = PHASES[phase];
+                wrap.appendChild(tag);
+            }
+            const content = document.createElement('div');
+            content.textContent = text;
+            wrap.appendChild(content);
+            el.messages.appendChild(wrap);
+            el.messages.scrollTop = el.messages.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const text = el.input.value.trim();
+            if (!text) return;
+
+            const nick = localStorage.getItem('bdi_nickname');
+            if (!nick) { showError('请先设置建造者代号'); el.nickModal.classList.add('active'); return; }
+
+            // 检查 GF 状态
+            if (!state.gfPassed) {
+                showError('请先完成 GF 前置测试');
+                showGFBlocked();
+                return;
+            }
+
+            appendMsg(text, 'user');
+            el.input.value = '';
+            el.send.disabled = true;
+
+            const loadDiv = document.createElement('div');
+            loadDiv.className = 'msg bot';
+            loadDiv.innerHTML = '<span class="phase-tag">计算中...</span>正在执行协议逻辑...';
+            el.messages.appendChild(loadDiv);
+            el.messages.scrollTop = el.messages.scrollHeight;
+
+            try {
+                const res = await fetch('/api/bdi/probe', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: text,
+                        sessionId: state.sessionId,
+                        nickname: nick,
+                        gfSessionId: state.gfSessionId,
+                    })
+                });
+
+                if (res.status === 403) {
+                    const errData = await res.json();
+                    loadDiv.remove();
+                    showError(errData.message || 'GF 门槛校验失败');
+                    appendMsg(`⚠️ ${errData.message || 'GF 校验失败，请重新完成前置测试'}`, 'bot', 'error');
+                    // 清除本地 GF 状态
+                    localStorage.removeItem('gf_session_id');
+                    localStorage.removeItem('gf_passed');
+                    localStorage.removeItem('gf_score');
+                    localStorage.removeItem('gf_anchor');
+                    setTimeout(() => showGFBlocked(), 1000);
+                    return;
+                }
+
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+
+                loadDiv.remove();
+                appendMsg(data.reply, 'bot', data.phase);
+
+                if (data.phase === 'report') {
+                    setTimeout(() => {
+                        const tip = document.createElement('div');
+                        tip.className = 'msg bot';
+                        tip.innerHTML = '<span class="phase-tag">探测完成</span>你的报告已保存。查看排行榜：🏆 <a href="/leaderboard.html" style="color: var(--primary);">排行榜</a>';
+                        el.messages.appendChild(tip);
+                        el.messages.scrollTop = el.messages.scrollHeight;
+                    }, 500);
+                }
+
+            } catch (err) {
+                loadDiv.remove();
+                appendMsg(`⚠️ 请求失败：${err.message}`, 'bot', 'error');
+                console.error(err);
+            } finally {
+                el.send.disabled = false;
+                el.input.focus();
+            }
+        }
+
+        // ========================
+        // 事件监听
+        // ========================
+        el.send.addEventListener('click', sendMessage);
+        el.input.addEventListener('keydown', e => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+        });
+        el.nickInput.addEventListener('keydown', e => {
+            if (e.key === 'Enter') confirmNickname();
+        });
+
+        // 启动
+        init();
+    </script>
+</body>
+</html>

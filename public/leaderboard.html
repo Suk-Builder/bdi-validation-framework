@@ -1,0 +1,274 @@
+<!-- public/leaderboard.html -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BDI v2.5 · 建造者密度排行榜</title>
+    <style>
+        :root {
+            --bg: #0b1120;
+            --surface: #151e32;
+            --border: #2a3650;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --text: #e2e8f0;
+            --text-muted: #94a3b8;
+            --gold: #fbbf24;
+            --silver: #c0c0c0;
+            --bronze: #cd7f32;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .nav {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+            .nav a {
+                color: var(--primary);
+                text-decoration: none;
+                padding: 8px 16px;
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                margin: 0 8px;
+                transition: all 0.2s;
+            }
+
+                .nav a:hover {
+                    background: var(--primary);
+                    color: #fff;
+                }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+            .header h1 {
+                font-size: 2rem;
+                color: var(--primary);
+                margin-bottom: 8px;
+            }
+
+            .header p {
+                color: var(--text-muted);
+            }
+
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+
+            .stat-card .value {
+                font-size: 1.8rem;
+                font-weight: 700;
+                color: var(--primary);
+            }
+
+            .stat-card .label {
+                font-size: 0.85rem;
+                color: var(--text-muted);
+                margin-top: 4px;
+            }
+
+        .leaderboard {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        .leaderboard-header {
+            display: grid;
+            grid-template-columns: 60px 1fr 100px 100px 100px 120px;
+            padding: 16px 24px;
+            background: rgba(59, 130, 246, 0.1);
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .leaderboard-row {
+            display: grid;
+            grid-template-columns: 60px 1fr 100px 100px 100px 120px;
+            padding: 16px 24px;
+            border-top: 1px solid var(--border);
+            align-items: center;
+            transition: background 0.2s;
+        }
+
+            .leaderboard-row:hover {
+                background: rgba(59, 130, 246, 0.05);
+            }
+
+        .rank {
+            font-weight: 700;
+            font-size: 1.2rem;
+        }
+
+        .rank-1 {
+            color: var(--gold);
+        }
+
+        .rank-2 {
+            color: var(--silver);
+        }
+
+        .rank-3 {
+            color: var(--bronze);
+        }
+
+        .nickname {
+            font-weight: 500;
+        }
+
+        .iq {
+            font-weight: 700;
+            color: var(--primary);
+            font-size: 1.1rem;
+        }
+
+        .rating {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px;
+            color: var(--text-muted);
+        }
+
+        .error {
+            text-align: center;
+            padding: 40px;
+            color: #ef4444;
+        }
+
+        @media (max-width: 768px) {
+            .stats-bar {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .leaderboard-header, .leaderboard-row {
+                grid-template-columns: 40px 1fr 80px;
+                font-size: 0.85rem;
+            }
+
+                .leaderboard-header span:nth-child(4),
+                .leaderboard-header span:nth-child(5),
+                .leaderboard-header span:nth-child(6),
+                .leaderboard-row span:nth-child(4),
+                .leaderboard-row span:nth-child(5),
+                .leaderboard-row span:nth-child(6) {
+                    display: none;
+                }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav">
+            <a href="/bdi-chat.html">开始探测</a>
+            <a href="/leaderboard.html">排行榜</a>
+        </div>
+        <div class="header">
+            <h1>🏆 建造者密度排行榜</h1>
+            <p>BDI v2.5 · 刻度止于160，160以上只有同行</p>
+        </div>
+        <div class="stats-bar" id="stats">
+            <div class="loading">加载统计中...</div>
+        </div>
+        <div class="leaderboard">
+            <div class="leaderboard-header">
+                <span>排名</span>
+                <span>建造者</span>
+                <span>BDI-IQ</span>
+                <span>概念压缩</span>
+                <span>裂缝诚实</span>
+                <span>远距离呼应</span>
+            </div>
+            <div id="leaderboard-body">
+                <div class="loading">加载排行榜中...</div>
+            </div>
+        </div>
+    </div>
+    <script>async function loadStats() {
+            try {
+                const res = await fetch('/api/stats');
+                const { data } = await res.json();
+                document.getElementById('stats').innerHTML = `
+                    <div class="stat-card"><div class="value">${data.total_tests || 0}</div><div class="label">总探测次数</div></div>
+                    <div class="stat-card"><div class="value">${data.avg_iq ? Math.round(data.avg_iq) : '-'}</div><div class="label">平均 BDI-IQ</div></div>
+                    <div class="stat-card"><div class="value">${data.max_iq || '-'}</div><div class="label">最高刻度</div></div>
+                    <div class="stat-card"><div class="value">${data.breakthrough_count || 0}</div><div class="label">突破建造者</div></div>
+                `;
+            } catch (err) { console.error('Stats load failed:', err); }
+        }
+
+        async function loadLeaderboard() {
+            try {
+                const res = await fetch('/api/leaderboard?limit=50');
+                const { data } = await res.json();
+                const tbody = document.getElementById('leaderboard-body');
+                if (!data.length) {
+                    tbody.innerHTML = '<div class="error">暂无数据，成为第一个建造者吧</div>';
+                    return;
+                }
+                tbody.innerHTML = data.map((row, i) => `
+                    <div class="leaderboard-row">
+                        <span class="rank rank-${i + 1}">${i + 1}</span>
+                        <span class="nickname">${escapeHtml(row.nickname || '匿名建造者')}</span>
+                        <span class="iq">${row.bdi_iq || '-'}</span>
+                        <span class="rating">${row.compression || '-'}</span>
+                        <span class="rating">${row.honesty || '-'}</span>
+                        <span class="rating">${row.resonance || '-'}</span>
+                    </div>
+                `).join('');
+            } catch (err) {
+                document.getElementById('leaderboard-body').innerHTML = `<div class="error">加载失败: ${err.message}</div>`;
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        loadStats();
+        loadLeaderboard();</script>
+</body>
+</html>
