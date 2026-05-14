@@ -144,8 +144,17 @@
         <!-- 答题区域 -->
         <div id="quiz-area" class="hidden">
             <div class="header">
-                <h2>通用流体智力探测 (1/6)</h2>
+                <h2>通用流体智力探测</h2>
                 <div style="text-align: right; color: #999; font-size: 0.9em;">进度: <span id="progress">1</span>/6</div>
+                <div style="text-align:center;margin-top:8px;">
+                    <span style="font-size:0.8rem;color:#94a3b8;">已有密钥？</span>
+                    <input type="text" id="skip-key-input" placeholder="输入密钥" maxlength="10" 
+                           style="width:100px;padding:4px 8px;border:1px solid #cbd5e1;border-radius:4px;font-size:0.8rem;margin:0 4px;"
+                           autocomplete="off">
+                    <button onclick="verifyKey()" 
+                            style="padding:4px 12px;font-size:0.8rem;background:#64748b;color:#fff;border:none;border-radius:4px;cursor:pointer;">跳过</button>
+                    <div id="key-error" style="color:#ef4444;font-size:0.75rem;margin-top:4px;display:none;"></div>
+                </div>
             </div>
 
             
@@ -260,6 +269,43 @@
     }
 
     // 3. 显示结果
+    // 密钥验证
+    async function verifyKey() {
+        const keyInput = document.getElementById('skip-key-input');
+        const errorEl = document.getElementById('key-error');
+        const key = keyInput.value.trim();
+        if (!key) { errorEl.textContent = '请输入密钥'; errorEl.style.display = 'block'; return; }
+
+        keyInput.disabled = true;
+        errorEl.style.display = 'none';
+
+        try {
+            const res = await fetch('/api/gf/verify-key', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ key })
+            });
+            const data = await res.json();
+            if (data.success) {
+                // 保存密钥会话到 localStorage
+                localStorage.setItem('gf_session_id', data.sessionId);
+                localStorage.setItem('gf_passed', 'true');
+                localStorage.setItem('gf_score', '18');
+                if (data.sd15Anchor) localStorage.setItem('gf_anchor', data.sd15Anchor.label || '135+');
+                // 直接跳转到 BDI
+                window.location.href = '/bdi-chat.html';
+            } else {
+                errorEl.textContent = data.message || '密钥无效';
+                errorEl.style.display = 'block';
+                keyInput.disabled = false;
+            }
+        } catch (err) {
+            errorEl.textContent = '验证失败，请重试';
+            errorEl.style.display = 'block';
+            keyInput.disabled = false;
+        }
+    }
+
     function showResult(score, passed, sd15) {
         // 保存 GF 结果到 localStorage（供 BDI 页面读取）
         localStorage.setItem('gf_session_id', state.sessionId);
