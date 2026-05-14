@@ -230,6 +230,30 @@ async function saveReport(data) {
 const memSessions = new Map();     // sessionId -> { phase, conversation_id, nickname, messages[] }
 const gfGateCache = new Map();     // gfSessionId -> { passed, totalScore, sd15, bdiSessionId }
 
+// ========================
+// 密钥快速通道系统
+// ========================
+const SKIP_KEY = process.env.SKIP_KEY || '416520';
+const keySessions = new Map();     // gfSessionId -> { passed, totalScore, sd15, createdAt }
+
+/**
+ * 创建密钥通过的GF会话（模拟18分通过）
+ */
+function createKeySession() {
+  const sessionId = 'gf_key_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
+  keySessions.set(sessionId, {
+    passed: true,
+    totalScore: 18,
+    sd15: { label: '135+', desc: '密钥通道' },
+    isFinished: true,
+    progress: { current: 6, total: 6 },
+    createdAt: Date.now(),
+  });
+  // 30分钟后过期
+  setTimeout(() => keySessions.delete(sessionId), 30 * 60 * 1000);
+  return sessionId;
+}
+
 /**
  * GF→BDI 门槛校验中间件
  * BDI 探测前必须提供有效的 gfSessionId，且 GF 测试已通过（≥13分）
@@ -248,7 +272,24 @@ async function validateGFGate(req, res, next) {
     });
   }
 
-  // 2. 查询 GF 会话结果
+  // 2. 检查是否是密钥快速通道
+  const keyResult = keySessions.get(gfSessionId);
+  if (keyResult) {
+    // 密钥会话直接通过
+    if (bdiSessionId) {
+      gfGateCache.set(gfSessionId, {
+        passed: true,
+        totalScore: keyResult.totalScore,
+        sd15: keyResult.sd15,
+        bdiSessionId,
+        validatedAt: Date.now(),
+      });
+    }
+    req.gfResult = keyResult;
+    return next();
+  }
+
+  // 3. 查询 GF 会话结果
   const gfResult = getSessionResult(gfSessionId);
   if (!gfResult) {
     return res.status(403).json({
@@ -290,6 +331,33 @@ async function validateGFGate(req, res, next) {
   req.gfResult = gfResult;
   next();
 }
+
+// ========================
+// 密钥快速通道 API
+// ========================
+
+// POST /api/gf/verify-key - 验证跳过密钥
+app.post('/api/gf/verify-key', express.json(), (req, res) => {
+  const { key } = req.body;
+  if (!key) {
+    return res.status(400).json({ success: false, error: 'MISSING_KEY', message: '请输入密钥。' });
+  }
+  if (key === SKIP_KEY) {
+    const sessionId = createKeySession();
+    res.json({
+      success: true,
+      sessionId,
+      message: '密钥验证通过，可直接进入 BDI 核心探测。',
+      sd15Anchor: { label: '135+', desc: '密钥通道' },
+    });
+  } else {
+    res.status(403).json({
+      success: false,
+      error: 'INVALID_KEY',
+      message: '密钥无效，请完成 GF 前置测试或联系管理员获取有效密钥。',
+    });
+  }
+});
 
 // 注册 GF 门槛校验中间件（必须在 express.json 之后，BDI 路由之前）
 app.use(validateGFGate);
