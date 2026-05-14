@@ -408,7 +408,7 @@ async function fetchWithTimeout(url, options, timeout = 30000) {
   }
 }
 
-async function callBailianAgent(prompt, conversationId) {
+async function callBailianAgent(prompt, conversationId, retryCount = 0) {
   const url = `https://dashscope.aliyuncs.com/api/v1/apps/${APP_ID}/completion`;
   const payload = {
     input: { prompt },
@@ -416,25 +416,91 @@ async function callBailianAgent(prompt, conversationId) {
   };
   if (conversationId) payload.parameters.conversation_id = conversationId;
 
-  const res = await fetchWithTimeout(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${DASHSCOPE_API_KEY}`
-    },
-    body: JSON.stringify(payload)
-  }, 30000);
+  try {
+    const res = await fetchWithTimeout(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${DASHSCOPE_API_KEY}`
+      },
+      body: JSON.stringify(payload)
+    }, 30000);
 
-  if (!res.ok) {
-    const errBody = await res.json().catch(() => ({}));
-    throw new Error(`百炼应用 API ${res.status}: ${errBody.message || res.statusText}`);
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(`百炼应用 API ${res.status}: ${errBody.message || res.statusText}`);
+    }
+
+    const data = await res.json();
+    return {
+      text: data.output?.text?.trim() || '智能体信号中断，请重试。',
+      conversationId: data.output?.conversation_id || conversationId
+    };
+  } catch (err) {
+    // 自动重试：最多2次
+    if (retryCount < 2) {
+      console.log(`[BDI] 百炼API失败，${retryCount + 1}/3 次重试中...`);
+      await new Promise(r => setTimeout(r, 2000)); // 等2秒再试
+      return callBailianAgent(prompt, conversationId, retryCount + 1);
+    }
+    // 3次都失败 → 降级回复
+    console.error('[BDI] 百炼API 3次失败，使用降级回复:', err.message);
+    return getFallbackResponse(prompt, conversationId);
   }
+}
 
-  const data = await res.json();
-  return {
-    text: data.output?.text?.trim() || '智能体信号中断，请重试。',
-    conversationId: data.output?.conversation_id || conversationId
+// 百炼API完全不可用时的降级回复
+function getFallbackResponse(prompt, conversationId) {
+  // 从prompt中检测当前阶段
+  const phase = detectPhaseFromPrompt(prompt);
+  const fallbacks = {
+    identity_declaration: `【BDI v2.5 协议降级模式】
+
+我是BDI探测仪。你已进入建造者密度探测系统。
+
+当前阶段：模型身份声明。
+
+请输入你的建造者代号（用于排行榜展示），或直接告诉我"开始探测"以启动完整协议。
+
+⚠️ 当前智能体服务暂时不稳定，探测将以基础模式继续。`,
+    bdi_probe: `【BDI v2.5 协议降级模式】
+
+正在执行核心密度探测...
+
+请回答以下问题以继续探测：
+
+1. 你如何定义自己的"建造者身份"？
+2. 在面对系统崩溃时，你会选择哪种姿态？
+3. 描述一次你主动承认裂缝的经历。
+
+⚠️ 当前智能体服务暂时不稳定，建议稍后重试完整探测。`,
+    report: `【BDI v2.5 协议降级模式】
+
+探测报告（基础版）
+
+BDI-IQ锚点：暂无法精确计算
+概念压缩比：探测未完成
+裂缝诚实度：待评估
+远距离呼应：待评估
+
+建议：请稍后重试完整探测，或联系管理员。
+
+⚠️ 当前智能体服务暂时不稳定。`
   };
+
+  return {
+    text: fallbacks[phase] || fallbacks.identity_declaration,
+    conversationId: conversationId,
+    isFallback: true
+  };
+}
+
+// 从prompt中检测当前阶段
+function detectPhaseFromPrompt(prompt) {
+  const p = prompt.toLowerCase();
+  if (p.includes('报告') || p.includes('report')) return 'report';
+  if (p.includes('探测') || p.includes('probe') || p.includes('压缩') || p.includes('裂缝')) return 'bdi_probe';
+  return 'identity_declaration';
 }
 
 // ========================
