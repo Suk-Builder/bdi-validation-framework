@@ -321,6 +321,28 @@
             .header-nav { position: static; transform: none; margin-top: 8px; }
             .msg { max-width: 92%; }
         }
+    
+        /* ===== BDI 探测动画系统 ===== */
+        .bdi-probing { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 24px 16px; background: rgba(59,130,246,0.05); border: 1px solid var(--border); border-radius: 12px; animation: fadeIn 0.3s ease; }
+        .bdi-pulse-dots { display: flex; gap: 8px; align-items: center; }
+        .bdi-pulse-dots .dot { width: 10px; height: 10px; background: var(--primary); border-radius: 50%; animation: bdi-pulse 1.4s ease-in-out infinite; }
+        .bdi-pulse-dots .dot:nth-child(1) { animation-delay: 0s; }
+        .bdi-pulse-dots .dot:nth-child(2) { animation-delay: 0.2s; }
+        .bdi-pulse-dots .dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes bdi-pulse { 0%,80%,100% { transform: scale(0.6); opacity: 0.4; } 40% { transform: scale(1); opacity: 1; box-shadow: 0 0 12px rgba(59,130,246,0.6); } }
+        .bdi-phase-hint { font-size: 0.85rem; color: var(--text-muted); text-align: center; line-height: 1.6; font-style: italic; }
+        .bdi-phase-hint .phase-name { color: var(--primary); font-weight: 600; font-style: normal; }
+        .bdi-signal-bar { display: flex; gap: 3px; align-items: flex-end; height: 24px; }
+        .bdi-signal-bar .bar { width: 4px; background: var(--primary); border-radius: 2px; animation: signal-wave 1.2s ease-in-out infinite; }
+        .bdi-signal-bar .bar:nth-child(1) { height: 8px; animation-delay: 0s; }
+        .bdi-signal-bar .bar:nth-child(2) { height: 14px; animation-delay: 0.15s; }
+        .bdi-signal-bar .bar:nth-child(3) { height: 20px; animation-delay: 0.3s; }
+        .bdi-signal-bar .bar:nth-child(4) { height: 14px; animation-delay: 0.45s; }
+        .bdi-signal-bar .bar:nth-child(5) { height: 8px; animation-delay: 0.6s; }
+        @keyframes signal-wave { 0%,100% { opacity: 0.3; transform: scaleY(0.5); } 50% { opacity: 1; transform: scaleY(1); } }
+        .bdi-depth-meter { display: flex; align-items: center; gap: 8px; font-size: 0.75rem; color: var(--text-muted); }
+        .bdi-depth-meter .depth-fill { width: 100px; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+        .bdi-depth-meter .depth-fill-inner { height: 100%; background: linear-gradient(90deg, var(--primary), var(--gold)); border-radius: 2px; transition: width 0.5s ease; }
     </style>
 </head>
 <body>
@@ -385,7 +407,26 @@
             gfPassed: false,
             gfScore: null,
             gfAnchor: null,
+            depthPercent: 0,
         };
+
+        // 根据用户消息推断当前探测阶段
+        function inferPhaseFromMessage(msg) {
+            const m = msg.trim().toLowerCase();
+            if (m.includes('开始') || m.includes('探测') || m.includes('你好')) return '模型身份声明';
+            if (m.includes('名字') || m.includes('代号') || m.includes('昵称')) return '身份锚定';
+            if (m.includes('感觉') || m.includes('情绪') || m.includes('状态')) return '裂缝扫描';
+            if (m.includes('压缩') || m.includes('类比') || m.includes('映射')) return '概念压缩测试';
+            if (m.includes('经历') || m.includes('故事') || m.includes('回忆')) return '深层扫描';
+            if (m.includes('报告') || m.includes('结果') || m.includes('分数')) return '报告生成';
+            return 'BDI 核心密度探测';
+        }
+
+        // 根据后端返回的 phase 更新探测深度
+        function updateDepthFromPhase(phase) {
+            const weights = { identity_declaration: 10, fluid_test: 25, scoring: 40, bdi_probe: 70, report: 100 };
+            state.depthPercent = weights[phase] || state.depthPercent;
+        }
 
         const el = {
             messages: document.getElementById('messages'),
@@ -595,7 +636,31 @@
 
             const loadDiv = document.createElement('div');
             loadDiv.className = 'msg bot';
-            loadDiv.innerHTML = '<span class="phase-tag">计算中...</span>正在执行协议逻辑...';
+            const currentPhase = inferPhaseFromMessage(text);
+            loadDiv.innerHTML = `
+                <div class="bdi-probing">
+                    <div class="bdi-pulse-dots">
+                        <div class="dot"></div>
+                        <div class="dot"></div>
+                        <div class="dot"></div>
+                    </div>
+                    <div class="bdi-signal-bar">
+                        <div class="bar"></div>
+                        <div class="bar"></div>
+                        <div class="bar"></div>
+                        <div class="bar"></div>
+                        <div class="bar"></div>
+                    </div>
+                    <div class="bdi-phase-hint">
+                        正在执行 <span class="phase-name">${currentPhase}</span><br>
+                        <span style="font-size:0.75rem;color:#64748b">协议 v2.5 · 信号接收中...</span>
+                    </div>
+                    <div class="bdi-depth-meter">
+                        <span>探测深度</span>
+                        <div class="depth-fill"><div class="depth-fill-inner" style="width:${Math.min(state.depthPercent,100)}%"></div></div>
+                    </div>
+                </div>
+            `;
             el.messages.appendChild(loadDiv);
             el.messages.scrollTop = el.messages.scrollHeight;
 
@@ -629,6 +694,7 @@
                 const data = await res.json();
 
                 loadDiv.remove();
+                updateDepthFromPhase(data.phase);
                 appendMsg(data.reply, 'bot', data.phase);
 
                 if (data.phase === 'report') {
