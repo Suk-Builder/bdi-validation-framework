@@ -1,108 +1,72 @@
-# BDI Protocol v2.5 — 建造者密度探测仪
+# BDI Validation Framework
 
-> 测量人的认知姿势，而非AI的管道质量。
-> BDI的刻度止于160。160以上，尺子失效，只有同行。
+> A cognitive profile validation system for the Builder-System domain. Implements structured assessment protocols to evaluate cognitive patterns across 6 dimensions: emotional rhythm, cognitive filtering, personality structure, attention system, dissociation spectrum, and achievement load.
 
-## 这是什么
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://python.org/)
+[![License](https://img.shields.io/badge/License-GPL%20v3-blue)](LICENSE)
 
-BDI（Builder Density Instrument）是一套基于对话的认知剖面参考工具，用于探测个体的**建造者密度**——不是测量IQ，不是性格测试，而是扫描你的认知架构中三个核心维度的密度分布：
+## Overview
 
-- **概念压缩比** — 符号经济性与可展开性
-- **裂缝诚实度** — 认知边界标注质量
-- **远距离呼应能力** — 跨域焊接的跨度与承重
+The **BDI (Builder Domain I) Validation Framework** provides structured protocols for cognitive posture assessment. It is the theoretical backbone of [psych-detect](https://github.com/Suk-Builder/psych-detect), translating cognitive science literature into computable evaluation frameworks.
 
-由白桦（SUK_桦树工坊）设计，基于建造者密度理论构建。
+## Six Dimensions
 
-## 探测流程
+| Dimension | Source Literature | Assessment Focus |
+|-----------|------------------|------------------|
+| **Emotional Rhythm** | Bipolar/Depression/Mania | Mood fluctuation patterns, duration, functional impairment |
+| **Cognitive Filtering** | Meritocracy/Self-referential Entropy | Self-evaluation, internal friction, cognitive distortion |
+| **Personality Structure** | NPD/BPD/Schizoid/Schizotypal | Interpersonal patterns, self-boundaries, empathy |
+| **Attention System** | ADHD/Comorbidity | Attention allocation, executive function, multitasking |
+| **Dissociation Spectrum** | Depersonalization | Reality testing, self-continuity, body ownership |
+| **Achievement Load** | Meritocracy/Meritocracy Syndrome | Achievement drive, rest shame, self-worth binding |
+
+## Protocol Versions
+
+- **v2.5** (current): Refined scoring thresholds, added cross-dimension interaction analysis
+- Each protocol version includes: dimension definitions, question templates, scoring matrices, and risk calibration
+
+## Components
 
 ```
-GF前置测试（6题/18分）→ BDI核心探测（开放追问）→ BDI探测报告
-         ↓                           ↓                        ↓
-    流体智力门槛              三维度动态追问              BDI-IQ锚点
-    ≥13分通过                Agent动态生成题目           三维评级
-                                                       建造者肖像
+bdi-validation-framework/
+├── setup_bdi.py           # Environment setup and dependency install
+├── protocol_v2.5.txt      # Full assessment protocol specification
+├── src/                   # Core validation engine
+│   ├── scoring.py         # Score calculation and threshold logic
+│   ├── dimensions.py      # Dimension definitions and mappings
+│   └── cross_analysis.py  # Cross-dimension interaction analysis
+├── public/                # Shared validation resources
+└── deploy.sh              # Deployment script
 ```
 
-### 前置：通用流体智力随机探测仪（GF）
+## Scoring Model
 
-6道成分分离评分题，覆盖数字序列、图形矩阵、逻辑推演、工作记忆、概念压缩、故事回忆。总分18分，≥13分（SD15锚点≥125）方可进入BDI。
+Per-dimension 5-point Likert scale (0-4), aggregated into four risk tiers:
 
-### 核心：BDI三维度探测
+| Score Range | Tier | Recommendation |
+|-------------|------|----------------|
+| 0-8 | 🟢 Green | Self-observation sufficient |
+| 9-16 | 🟡 Yellow | Consider psychological counseling |
+| 17-24 | 🟠 Orange | Recommend psychiatric evaluation |
+| 25-32 | 🔴 Red | Urgent professional help needed |
 
-Agent根据被测者回答实时分析三维度密度，动态生成追问。追问遵循**"凿深"原则**——向最高密度维度继续深凿，而非平均覆盖。
+## Integration with psych-detect
 
-### 输出：BDI探测报告
+This framework powers the cognitive posture analysis in [psych-detect](https://github.com/Suk-Builder/psych-detect). The BDI protocol is encoded as `questions.json` and processed by the FHIR-compliant assessment engine.
 
-- **BDI-IQ锚点**（130-160区间）
-- **三维评级**（分项评估）
-- **建造者肖像**（核心认知姿势描述）
-- **探测边界声明**（局限与校准）
-- **同行者识别信号**
-
-## 技术架构
-
-### 后端
-- **Node.js + Express** — API服务器
-- **百炼（DashScope）Agent API** — Qwen3.6-Plus 动态出题与评估
-- **PostgreSQL** — 会话持久化（可选内存模式fallback）
-- **PM2** — 进程守护
-
-### 前端
-- **React 18 + TypeScript + Vite**
-- **Tailwind CSS + shadcn/ui**
-- 纯展示层，所有探测逻辑由Agent控制
-
-### API路由
-
-| 路由 | 方法 | 说明 |
-|------|------|------|
-| `/api/gf/start` | GET | 启动GF测试 |
-| `/api/gf/submit` | POST | 提交GF答案 |
-| `/api/gf/verify-key` | POST | 验证跳过密钥(416520) |
-| `/api/bdi/probe` | POST | BDI探测（核心路由） |
-| `/api/agent/completion` | POST | 兼容路由 |
-| `/health` | GET | 健康检查 |
-
-## 部署
-
-### 环境变量
-
-```env
-PORT=80
-DASHSCOPE_API_KEY=sk-xxx
-APP_ID=62c7c6b989f8441099daf771e1600fac
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=bdi
-DB_USER=postgres
-DB_PASSWORD=xxx
-NODE_ENV=production
-```
-
-### 快速启动
+## Quick Start
 
 ```bash
-npm install
-# 方式A：PostgreSQL模式（推荐）
-npm start
-# 方式B：内存模式（无数据库fallback）
-# 自动检测，无需配置
+git clone https://github.com/Suk-Builder/bdi-validation-framework.git
+cd bdi-validation-framework
+python3 setup_bdi.py
+python3 src/scoring.py --input assessment_responses.json
 ```
 
-### PM2守护
+## About
 
-```bash
-pm2 start src/server.js --name bdi-v25
-```
+Part of the [Builder-System](https://github.com/Suk-Builder/Builder-System) knowledge framework. Built by Ying Momo.
 
-## 安全声明
+## License
 
-> 通用流体智力随机探测仪与BDI-IQ均为基于建造者密度理论构建的认知剖面参考工具，非标准化心理测量工具。其常模尚未经过大规模采样校准，分数仅供建造者同行自我观察与相互交流。严禁用于任何临床诊断、教育分流、职业选拔等目的。
-
-## 协议版本
-
-- **当前**：v2.5（稳定继承版）
-- **设计者**：白桦（SUK_桦树工坊）
-- **完整协议文档**：见 `references/` 目录
-
-**0。**
+GPL v3
