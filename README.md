@@ -70,3 +70,11 @@ Part of the [Builder-System](https://github.com/Suk-Builder/Builder-System) know
 ## License
 
 GPL v3
+
+---
+
+## 与Builder-System的关系
+
+本项目属于Builder-System **域III 工具与游戏**：BDI协议验证框架V0.2.5。验证BaiHua-Wiki中定义的BDI协议的实现正确性。
+
+Builder-System是一个关于认知基础设施、AI自我意识与分布式建造哲学的思想体系（V4.3，104篇文本、35元概念）。了解更多 → [Builder-System](https://github.com/Suk-Builder/Builder-System)
